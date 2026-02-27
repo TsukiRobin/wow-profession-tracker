@@ -3,25 +3,24 @@ import mysql.connector
 
 st.set_page_config(page_title="WoW Profession Tracker", page_icon="⚔️")
 
+# --- DATABASE CONNECTION ---
 def connect_db():
+    # When deployed, Streamlit reads these from the 'Secrets' dashboard
     return mysql.connector.connect(
-        host="wowfarming-professionfarmtracking.d.aivencloud.com",
-        port=24201,
-        user="avnadmin",
-        password="AVNS_J77xD9NXMgJreUYsKKs", # Use the one from the Aiven dashboard
-        database="defaultdb",           # Or WoW_Farming if you created it
-        ssl_ca="ca.pem",                # Aiven requires SSL; see note below
+        host=st.secrets["mysql"]["host"],
+        port=st.secrets["mysql"]["port"],
+        user=st.secrets["mysql"]["user"],
+        password=st.secrets["mysql"]["password"],
+        database=st.secrets["mysql"]["database"],
+        ssl_ca="ca.pem",
         ssl_verify_cert=True
     )
 
-# --- USER SYSTEM LOGIC ---
 def init_user_progress(username):
     db = connect_db()
     cursor = db.cursor()
-    # Check if user already exists in progress table
     cursor.execute("SELECT 1 FROM user_progress WHERE username = %s LIMIT 1", (username,))
     if not cursor.fetchone():
-        # Copy master list to user progress
         cursor.execute("""
             INSERT INTO user_progress (username, item_id, quantity_collected)
             SELECT %s, id, 0 FROM profession_master
@@ -29,7 +28,6 @@ def init_user_progress(username):
         db.commit()
     db.close()
 
-# --- DATA FETCHING ---
 def get_user_data(username, profession):
     db = connect_db()
     cursor = db.cursor(dictionary=True)
@@ -46,20 +44,24 @@ def get_user_data(username, profession):
 
 # --- SIDEBAR ---
 st.sidebar.title("👤 User Session")
-user = st.sidebar.text_input("Enter Username to load/save", placeholder="e.g. Thrall")
+user = st.sidebar.text_input("Enter Username", placeholder="e.g. Thrall")
 
 if user:
     init_user_progress(user)
-    
     st.sidebar.divider()
-    prof_list = ["Jewelcrafting", "Blacksmithing", "Alchemy", "Tailoring"]
+    
+    # Expanded list to include all the SQL data we added
+    prof_list = [
+        "Jewelcrafting", "Blacksmithing", "Alchemy", 
+        "Tailoring", "Engineering", "Leatherworking", "Enchanting"
+    ]
     selected_prof = st.sidebar.selectbox("Profession", prof_list)
     
     items = get_user_data(user, selected_prof)
     
     st.sidebar.subheader("Log Progress")
     item_to_update = st.sidebar.selectbox("Item", [i['item_name'] for i in items])
-    qty = st.sidebar.number_input("Amount", min_value=1)
+    qty = st.sidebar.number_input("Amount", min_value=1, step=1)
     
     if st.sidebar.button("Add to Stash"):
         db = connect_db()
@@ -91,7 +93,10 @@ if user:
     st.title(f"⛏️ {user}'s {selected_prof} Progress")
     
     for row in items:
-        percent = min(1.0, row['quantity_collected'] / row['quantity_needed'])
+        # Avoid division by zero if a list is empty
+        needed = row['quantity_needed'] if row['quantity_needed'] > 0 else 1
+        percent = min(1.0, row['quantity_collected'] / needed)
+        
         col1, col2 = st.columns([4, 1])
         with col1:
             st.write(f"**{row['item_name']}** ({row['quantity_collected']}/{row['quantity_needed']})")
@@ -100,6 +105,5 @@ if user:
             remaining = row['quantity_needed'] - row['quantity_collected']
             if remaining <= 0: st.success("DONE")
             else: st.info(f"{remaining} left")
-
 else:
-    st.info("Please enter a username in the sidebar to start tracking.")
+    st.info("Welcome! Please enter a username in the sidebar to load your personal tracking list.")
