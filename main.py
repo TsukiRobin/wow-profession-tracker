@@ -5,7 +5,7 @@ st.set_page_config(page_title="WoW Profession Tracker", page_icon="⚔️")
 
 # --- DATABASE CONNECTION ---
 def connect_db():
-    # When deployed, Streamlit reads these from the 'Secrets' dashboard
+    
     return mysql.connector.connect(
         host=st.secrets["mysql"]["host"],
         port=st.secrets["mysql"]["port"],
@@ -50,7 +50,7 @@ if user:
     init_user_progress(user)
     st.sidebar.divider()
     
-    # Expanded list to include all the SQL data we added
+   
     prof_list = [
         "Jewelcrafting", "Blacksmithing", "Alchemy", 
         "Tailoring", "Engineering", "Leatherworking", "Enchanting"
@@ -93,7 +93,7 @@ if user:
     st.title(f"⛏️ {user}'s {selected_prof} Progress")
     
     for row in items:
-        # Avoid division by zero if a list is empty
+        
         needed = row['quantity_needed'] if row['quantity_needed'] > 0 else 1
         percent = min(1.0, row['quantity_collected'] / needed)
         
